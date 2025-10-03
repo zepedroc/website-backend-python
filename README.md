@@ -5,8 +5,9 @@ A FastAPI backend service configured with CORS to work with frontend application
 ## Features
 
 - FastAPI framework
-- CORS middleware configured for localhost:3000
+- CORS middleware configured for local development and production (zepedrocmota.com)
 - Basic health check endpoint
+- Ready for Vercel serverless deployment
 
 ## Setup
 
@@ -40,7 +41,31 @@ website-backend-python/
 
 ## Requirements
 
-- Python 3.13+
+- Python 3.12+
 - FastAPI
 - Uvicorn
+
+## Deployment to Vercel
+
+This project is configured for deployment to Vercel as a serverless function.
+
+### Files for Vercel Deployment
+
+- `requirements.txt` - Python dependencies for Vercel
+- `vercel.json` - Vercel configuration specifying the Python runtime and routes
+
+### Manual Deployment Steps
+
+1. Push your code to a GitHub repository
+2. Connect your repository to Vercel via the Vercel dashboard
+3. Vercel will automatically detect the configuration and deploy
+4. Your API will be available at your Vercel domain
+5. FastAPI automatic docs will be available at `/docs`
+
+### CORS Configuration
+
+The app is configured to accept requests from:
+- `http://localhost:3000` (local development)
+- `https://www.zepedrocmota.com` (production)
+- `https://zepedrocmota.com` (production without www)
 
