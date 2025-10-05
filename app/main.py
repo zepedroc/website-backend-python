@@ -19,3 +19,8 @@ app.add_middleware(
 @app.get("/")
 def read_root():
     return {"ok": True}
+
+# Routers
+from .routers_contact import router as contact_router  # noqa: E402
+
+app.include_router(contact_router)
