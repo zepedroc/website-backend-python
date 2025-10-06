@@ -28,3 +28,25 @@ async def draft_contact_message(sender_name: str, sender_email: str, subject: st
     return (result.final_output or "").strip()
 
 
+
+async def improve_contact_draft(draft: str, comment: str) -> str:
+    """Improve a contact message draft based on a user's improvement comment.
+
+    Preserve the original intent and any existing sign-off if appropriate. Do not
+    add a subject line, and keep the message addressed to José.
+    """
+    user_prompt = (
+        "You will receive a contact message draft and a user comment explaining how to improve it.\n"
+        "Do not include the subject line. Keep it addressed to José. Preserve a brief sign-off if present.\n\n"
+        f"Draft:\n{draft}\n\n"
+        f"User comment:\n{comment}\n\n"
+        "Return only the improved message."
+    )
+
+    agent = get_agent()
+    result = await Runner.run(
+        agent,
+        user_prompt,
+    )
+    return (result.final_output or "").strip()
+
