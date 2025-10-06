@@ -15,6 +15,8 @@ async def draft_contact_message(sender_name: str, sender_email: str, subject: st
         f"Sender email: {sender_email}\n"
         f"Subject: {subject}\n\n"
         "Constraints:\n- Keep between 80 and 140 words.\n- Warm and professional tone.\n"
+        "- Email needs to be addressed to José"
+        "- Do not include the subject on the message"
         "- Avoid commitments or scheduling.\n- Include a brief sign-off with the sender name."
     )
 
