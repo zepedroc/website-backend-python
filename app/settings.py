@@ -11,6 +11,7 @@ class Settings(BaseSettings):
 
     # App configuration
     APP_NAME: str = "website-backend-python"
+    ENV: str = "development"  # values: development|production
 
 
 @lru_cache
