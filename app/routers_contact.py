@@ -1,7 +1,11 @@
 from fastapi import APIRouter, HTTPException
+import logging
 from pydantic import BaseModel, EmailStr, Field
 
 from .services_contact import draft_contact_message, improve_contact_draft
+
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter(prefix="/api/contact", tags=["contact"])
@@ -28,9 +32,11 @@ async def create_draft(body: DraftRequest) -> DraftResponse:
         raise
     except ValueError as exc:
         # Configuration errors (e.g., missing API key)
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        logger.exception("Configuration error while generating draft")
+        raise HTTPException(status_code=500, detail="Server configuration error") from exc
     except Exception as exc:  # pragma: no cover - generic safety net
-        raise HTTPException(status_code=502, detail=f"Failed to generate draft: {str(exc)}") from exc
+        logger.exception("Unhandled error while generating draft")
+        raise HTTPException(status_code=502, detail="Failed to generate draft") from exc
 
 
 
@@ -50,8 +56,10 @@ async def improve_draft(body: ImproveDraftRequest) -> DraftResponse:
         raise
     except ValueError as exc:
         # Configuration errors (e.g., missing API key)
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        logger.exception("Configuration error while improving draft")
+        raise HTTPException(status_code=500, detail="Server configuration error") from exc
     except Exception as exc:  # pragma: no cover - generic safety net
-        raise HTTPException(status_code=502, detail=f"Failed to improve draft: {str(exc)}") from exc
+        logger.exception("Unhandled error while improving draft")
+        raise HTTPException(status_code=502, detail="Failed to improve draft") from exc
 
 

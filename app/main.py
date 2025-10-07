@@ -1,7 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from .settings import settings
 
-app = FastAPI()
+docs_kwargs = {}
+if settings.ENV.lower() == "production":
+    docs_kwargs = {"docs_url": None, "redoc_url": None, "openapi_url": "/openapi.json"}
+
+app = FastAPI(**docs_kwargs)
 
 # Configure CORS for both local development and production
 app.add_middleware(
