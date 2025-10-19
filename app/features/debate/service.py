@@ -1,11 +1,149 @@
 from typing import AsyncGenerator, Dict, Any
+import httpx
 from agents import Agent, Runner, set_default_openai_client
 from openai import AsyncOpenAI
+from bs4 import BeautifulSoup
+import re
 
 from ...settings import settings
 
 
-async def generate_debate(topic: str) -> AsyncGenerator[Dict[str, Any], None]:
+async def scrape_webpage(url: str, max_length: int = 2000) -> str:
+    """
+    Scrape and extract main text content from a webpage.
+    
+    Args:
+        url: The URL to scrape
+        max_length: Maximum characters to return
+        
+    Returns:
+        Cleaned text content or empty string on error
+    """
+    try:
+        async with httpx.AsyncClient(follow_redirects=True) as client:
+            response = await client.get(
+                url,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                },
+                timeout=8.0
+            )
+            response.raise_for_status()
+            
+            # Parse HTML
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Remove script and style elements
+            for script in soup(["script", "style", "nav", "footer", "header"]):
+                script.decompose()
+            
+            # Get text
+            text = soup.get_text()
+            
+            # Clean up whitespace
+            lines = (line.strip() for line in text.splitlines())
+            chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+            text = ' '.join(chunk for chunk in chunks if chunk)
+            
+            # Truncate if too long
+            if len(text) > max_length:
+                text = text[:max_length] + "..."
+            
+            return text
+            
+    except Exception as e:
+        print(f"Error scraping {url}: {e}")
+        return ""
+
+
+async def refine_search_query(topic: str) -> str:
+    """
+    Use an LLM agent to convert a debate topic into an optimized search query.
+    
+    Args:
+        topic: The original debate topic
+        
+    Returns:
+        A refined, search-engine-friendly query string
+    """
+    query_agent = Agent(
+        name="Search Query Optimizer",
+        instructions="You are an expert at creating effective search queries for Google.",
+        model="llama-3.3-70b-versatile",
+    )
+    
+    prompt = (
+        f"Convert this debate topic into a concise Google search query (max 10 words) "
+        f"that will find recent, relevant information:\n\n"
+        f"Topic: {topic}\n\n"
+        f"Respond with ONLY the search query, nothing else."
+    )
+    
+    result = await Runner.run(query_agent, prompt)
+    return (result.final_output or topic).strip()
+
+
+async def perform_web_search(query: str) -> str:
+    """
+    Perform a web search using SerpAPI and scrape actual content from top results.
+    
+    Args:
+        query: The search query
+        
+    Returns:
+        Formatted string with actual web content or empty string on error
+    """
+    if not settings.SERPAPI_API_KEY:
+        print("SERPAPI_API_KEY is not set")
+        return ""
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://serpapi.com/search",
+                params={
+                    "engine": "google",
+                    "q": query,
+                    "num": 5,
+                    "api_key": settings.SERPAPI_API_KEY
+                },
+                timeout=10.0
+            )
+            response.raise_for_status()
+            data = response.json()
+            
+            # Get top URLs from organic results
+            urls = []
+            for item in data.get("organic_results", [])[:3]:  # Top 3 results
+                link = item.get("link", "")
+                title = item.get("title", "")
+                if link and title:
+                    urls.append((link, title))
+            
+            if not urls:
+                print("No search results found")
+                return ""
+            
+            # Scrape content from each URL
+            results = []
+            for url, title in urls:
+                print(f"Scraping: {title}")
+                content = await scrape_webpage(url)
+                if content:
+                    results.append(f"📄 {title}\n{content}\nSource: {url}")
+            
+            if results:
+                combined = "\n\n" + "="*80 + "\n\n"
+                return combined.join(results)
+            return ""
+            
+    except Exception as e:
+        # Silently fail and return empty string if search fails
+        print(f"Search error: {e}")
+        return ""
+
+
+async def generate_debate(topic: str, allow_search: bool = True) -> AsyncGenerator[Dict[str, Any], None]:
     """
     Generate a debate between two AI agents with opposing positions on a given topic.
     
@@ -14,10 +152,12 @@ async def generate_debate(topic: str) -> AsyncGenerator[Dict[str, Any], None]:
     
     Args:
         topic: The debate topic or question
+        allow_search: Whether to enable web search for additional context (default: True)
         
     Yields:
         Dict with keys: speaker (str), message (str), position (str)
     """
+
     if not settings.GROQ_API_KEY:
         raise ValueError("GROQ_API_KEY is not set")
     
@@ -31,16 +171,16 @@ async def generate_debate(topic: str) -> AsyncGenerator[Dict[str, Any], None]:
     # Determine the two opposing positions from the topic
     position_agent = Agent(
         name="Position Analyzer",
-        instructions="You are an expert at identifying opposing viewpoints on any topic or question.",
+        # instructions="You are an expert at identifying opposing viewpoints on any topic or question.",
         model="llama-3.3-70b-versatile",
     )
     
     position_prompt = (
         f"Given this topic or question: '{topic}'\n\n"
-        "Identify two clear, opposing positions that could be debated. "
-        "Respond with ONLY two brief position statements (max 10 words each), one per line:\n"
-        "Position 1: [brief statement]\n"
-        "Position 2: [brief statement]"
+        "Decide the two sides of the debate and the position of the each side. Make it general, don't try to be specific about reasons"
+        "Respond with ONLY the two sides of the debate, one per line:\n"
+        "Side 1: [side 1]\n"
+        "Side 2: [side 2]"
     )
     
     position_result = await Runner.run(position_agent, position_prompt)
@@ -48,13 +188,30 @@ async def generate_debate(topic: str) -> AsyncGenerator[Dict[str, Any], None]:
     
     # Parse positions
     lines = [line.strip() for line in positions_text.split("\n") if line.strip()]
-    position_1 = lines[0].replace("Position 1:", "").strip() if len(lines) > 0 else "Supporting the topic"
-    position_2 = lines[1].replace("Position 2:", "").strip() if len(lines) > 1 else "Opposing the topic"
+    position_1 = lines[0].replace("Side 1:", "").strip() if len(lines) > 0 else "Supporting the topic"
+    position_2 = lines[1].replace("Side 2:", "").strip() if len(lines) > 1 else "Opposing the topic"
+
+    print("position_1: ", position_1)
+    print("position_2: ", position_2)
+    
+    # Perform web search for additional context if enabled
+    search_context = ""
+    if allow_search:
+        search_query = await refine_search_query(topic)
+        search_results = await perform_web_search(search_query)
+        
+        # Format search context for debaters
+        if search_results:
+            search_context = (
+                f"Background information from recent sources:\n\n"
+                f"{search_results}\n\n"
+            )
     
     # Create two debater agents with opposing positions
     debater_1 = Agent(
         name="Debater 1",
         instructions=(
+            f"{search_context}"
             f"You're chatting as a friend who leans toward: {position_1}.\n"
             f"Topic: {topic}\n\n"
             "Style guidelines (casual chat, not a courtroom):\n"
@@ -71,6 +228,7 @@ async def generate_debate(topic: str) -> AsyncGenerator[Dict[str, Any], None]:
     debater_2 = Agent(
         name="Debater 2",
         instructions=(
+            f"{search_context}"
             f"You're chatting as a friend who leans toward: {position_2}.\n"
             f"Topic: {topic}\n\n"
             "Style guidelines (casual chat, not a courtroom):\n"

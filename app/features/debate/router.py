@@ -15,16 +15,17 @@ router = APIRouter(prefix="/api/debate", tags=["debate"])
 
 class DebateRequest(BaseModel):
     topic: str = Field(..., min_length=1, max_length=500)
+    allowSearch: bool = Field(default=True, description="Enable/disable web search for debate context")
 
 
-async def debate_event_generator(topic: str):
+async def debate_event_generator(topic: str, allow_search: bool = True):
     """
     Generator that yields Server-Sent Events (SSE) for each debate message.
     
     Format: data: {json}\n\n
     """
     try:
-        async for message_data in generate_debate(topic):
+        async for message_data in generate_debate(topic, allow_search=allow_search):
             # Format as SSE
             json_data = json.dumps(message_data)
             yield f"data: {json_data}\n\n"
@@ -54,7 +55,7 @@ async def create_debate(body: DebateRequest):
     """
     try:
         return StreamingResponse(
-            debate_event_generator(body.topic.strip()),
+            debate_event_generator(body.topic.strip(), allow_search=body.allowSearch),
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
