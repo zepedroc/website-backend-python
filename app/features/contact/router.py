@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 import logging
 from pydantic import BaseModel, EmailStr, Field
 
-from .services_contact import draft_contact_message, improve_contact_draft
+from .service import draft_contact_message, improve_contact_draft
 
 
 logger = logging.getLogger(__name__)
@@ -61,5 +61,6 @@ async def improve_draft(body: ImproveDraftRequest) -> DraftResponse:
     except Exception as exc:  # pragma: no cover - generic safety net
         logger.exception("Unhandled error while improving draft")
         raise HTTPException(status_code=502, detail="Failed to improve draft") from exc
+
 
 
