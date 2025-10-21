@@ -1,5 +1,6 @@
 from typing import AsyncGenerator, Dict, Any
 import httpx
+import asyncio
 from agents import Agent, Runner, set_default_openai_client
 from openai import AsyncOpenAI
 from bs4 import BeautifulSoup
@@ -126,9 +127,19 @@ async def perform_web_search(query: str) -> str:
             
             # Scrape content from each URL
             results = []
+            tasks = []
+            titles = []
             for url, title in urls:
                 print(f"Scraping: {title}")
-                content = await scrape_webpage(url)
+                tasks.append(scrape_webpage(url))
+                titles.append((url, title))
+
+            contents = await asyncio.gather(*tasks, return_exceptions=True)
+
+            for (url, title), content in zip(titles, contents):
+                if isinstance(content, Exception):
+                    print(f"Error scraping {url}: {content}")
+                    continue
                 if content:
                     results.append(f"📄 {title}\n{content}\nSource: {url}")
             
