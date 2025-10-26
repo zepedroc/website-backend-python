@@ -13,8 +13,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",  # Local development
-        "https://www.zepedrocmota.com",  # Production domain
-        "https://zepedrocmota.com",  # Production domain without www
+        "https://www.zepedrocmota.com",  # Personal portfolio domain
+        "https://whatevs-zepedrocm.vercel.app",  # Whatevs app domain
     ],
     allow_credentials=True,
     allow_methods=["*"],
