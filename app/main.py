@@ -26,6 +26,8 @@ def read_root():
     return {"ok": True}
 
 # Routers
-from .routers_contact import router as contact_router  # noqa: E402
+from .features.contact.router import router as contact_router  # noqa: E402
+from .features.debate.router import router as debate_router  # noqa: E402
 
 app.include_router(contact_router)
+app.include_router(debate_router)

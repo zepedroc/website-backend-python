@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str | None = None
     OPENAI_BASE_URL: str = "https://api.groq.com/openai/v1"
 
+    # SerpAPI configuration
+    SERPAPI_API_KEY: str | None = None
+
     # App configuration
     APP_NAME: str = "website-backend-python"
     ENV: str = "development"  # values: development|production
